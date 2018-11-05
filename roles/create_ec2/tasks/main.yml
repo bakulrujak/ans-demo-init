@@ -1,0 +1,66 @@
+---
+- name: Get VPC info
+  ec2_vpc_net_facts:
+    filters:
+      "tag:Name" : "{{ VPCNAME }}"
+  register: vpc_info
+  
+- name: Get Subnet ID
+  ec2_vpc_subnet_facts:
+    filters:
+      "tag:environment": "{{ ENVNAME }}"
+  register: subnet_info    
+
+- name: Create Ec2 instances
+  ec2:
+    key_name: awsdemo
+    instance_type: "{{ EC2INSTANCETYPE }}"
+    region: "{{ REGION }}"
+    group: "{{ EC2_GROUPS }}"
+    image: "{{ EC2AMIID }}"
+    wait: yes
+    wait_timeout: 450
+    count: "{{ EC2INSTANCENUMBER }}"
+    vpc_subnet_id: "{{ subnet_info.subnets[0].subnet_id }}"
+    assign_public_ip: yes
+    instance_tags:
+      Name: "{{ ENVID }} - Umbrella-{{ ENVNAME }}"
+      deployment_group: "umbrella:{{ ENVNAME }}"
+      environment: "{{ ENVNAME }}"
+  register: ec2_instance
+
+- name: Set ELB Target Group
+  elb_target_group:
+    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+    protocol: http
+    port: "{{ UMBRELLAPORT }}"
+    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+    health_check_path: "{{ HEALTHCHECKPATH }}"
+    successful_response_codes: "200"
+    targets:
+      - Id: "{{ ec2_instance.instances[0].id }}"
+        Port: "{{ UMBRELLAPORT }}"
+      - Id: "{{ ec2_instance.instances[1].id }}"
+        Port: "{{ UMBRELLAPORT }}"
+    state: present
+
+- name: Create Application Load Balancer
+  elb_application_lb:
+    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+    security_groups:
+      - "awsdemo-{{ ENVID }}-{{ ENVNAME }}-http"
+    subnets:
+      - "{{ subnet_info.subnets[0].subnet_id }}"
+      - "{{ subnet_info.subnets[1].subnet_id }}"
+    listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+    state: present
+  register: elb
+
+- name: ELB Summary
+  debug:
+    msg: "Your new endpoint is: {{ elb.dns_name }}" 

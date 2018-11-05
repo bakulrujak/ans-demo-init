@@ -1,0 +1,138 @@
+---
+- name: Create VPC
+  ec2_vpc_net:
+    name: "{{ VPCNAME }}"
+    cidr_block: "{{ CIDRVPC }}"
+    region: "{{ REGION }}"
+    tenancy: default
+    state: present
+  register: vpc   
+
+- name: Create Internet Gateway
+  ec2_vpc_igw:
+    region: "{{ REGION }}"
+    vpc_id: "{{ vpc.vpc.id }}"
+    state: present
+  register: igw 
+
+- name: Create Subnet a
+  ec2_vpc_subnet:
+    state: present
+    vpc_id: "{{ vpc.vpc.id }}"
+    az: "{{ REGION }}a"
+    cidr: "{{ CIDRSUBNET1 }}"
+    ipv6_cidr: ''
+    resource_tags:
+      Name: "{{ VPCNAME }}.a"
+      environment: "{{ ENVNAME }}"
+  register: subnet_a
+
+- name: Create Subnet b 
+  ec2_vpc_subnet:
+    state: present
+    cidr: "{{ CIDRSUBNET2 }}"
+    ipv6_cidr: ''
+    vpc_id: "{{ vpc.vpc.id }}"
+    az: "{{ REGION }}b"
+    resource_tags:
+      Name: "{{ VPCNAME }}.b"
+      environment: "{{ ENVNAME }}"
+  register: subnet_b
+
+- name: Create Routing Table
+  ec2_vpc_route_table:
+    vpc_id: "{{ vpc.vpc.id }}"
+    tags:
+      Name: "demoaws-{{ ENVNAME }}-{{ ENVID }}-igw"
+    subnets: "{{ item }}" 
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw.gateway_id }}"
+  register: routing_table
+  with_items:
+    - "{{ ALLSUBNETS }}"
+
+- name: Create Security Group - SSH
+  register: sg_ssh
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-ssh"
+    description: SSH Connections
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 22
+        cidr_ip: "{{ EVERYONE }}"
+
+- name: Create Security Group - JAVA
+  register: sg_java
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-java"
+    description: JAVA Ports
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 9000
+        - 9090
+        cidr_ip: "{{ EVERYONE }}"
+
+- name: Create Security Group - PHX
+  register: sg_phx
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-phx"
+    description: Phoenix standard
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 4000
+        - 4100
+        cidr_ip: "{{ EVERYONE }}"
+      - proto: tcp
+        from_port: 1
+        to_port: 65000
+        cidr_ip: "{{ CIDRVPC }}"        
+
+- name: Create Security Group - HTTP
+  register: sg_http
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-http"
+    description: HTTP standard
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 80
+        - 443
+        cidr_ip: "{{ EVERYONE }}"
+
+- name: Create Security Group - Postgres Private
+  register: sg_postgres_private
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-PostgresPrivate"
+    description: Postgres private access
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 5432
+        cidr_ip: "{{ CIDRVPC }}"
+
+- name: Create Security Group - Postgres Public
+  register: sg_postgres_public
+  ec2_group:
+    name: "sg-{{ ENVID }}-{{ ENVNAME }}-PostgresPublic"
+    description: Postgres Public access
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ REGION }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 5432
+        cidr_ip: "{{ EVERYONE }}"

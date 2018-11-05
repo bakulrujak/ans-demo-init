@@ -1,0 +1,31 @@
+[dev]
+1.2.3.4 nodename='dev.1'
+1.2.3.5 nodename='dev.2'
+
+[staging]
+1.2.3.7 nodename='staging.1'
+1.2.2.4 nodename='staging.2'
+
+[demo]
+1.3.3.4 nodename='demo.1'
+2.2.3.4 nodename='demo.2'
+
+[prod]
+1.2.3.9 nodename='prod.1'
+1.8.3.4 nodename='prod.2'
+
+[tools:children]
+prod
+staging
+
+[ops:children]
+dev
+staging
+demo
+prod
+
+[ops:vars]
+remote_user=ubuntu
+
+[awsrunner]
+localhost ansible_connection=local ansible_python_interpreter=python

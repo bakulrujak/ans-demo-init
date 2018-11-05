@@ -1,0 +1,9 @@
+---
+- name: Project Apollo
+  hosts: awsrunner
+  become: no
+  vars_files:
+    - public_vars/main.yml
+  roles:
+    - create_vpc
+    - create_ec2

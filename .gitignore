@@ -1,0 +1,7 @@
+*.retry
+venv/
+.DS_Store
+hosts
+sandbox.yml
+public_vars/creds.yml
+public_vars/main.yml
