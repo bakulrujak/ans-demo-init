@@ -24,31 +24,29 @@
     vpc_subnet_id: "{{ subnet_info.subnets[0].subnet_id }}"
     assign_public_ip: yes
     instance_tags:
-      Name: "{{ ENVID }} - Umbrella-{{ ENVNAME }}"
-      deployment_group: "umbrella:{{ ENVNAME }}"
+      Name: "{{ ENVID }} - AWSDemo-{{ ENVNAME }}"
+      deployment_group: "{{ ENVNAME }}"
       environment: "{{ ENVNAME }}"
   register: ec2_instance
 
 - name: Set ELB Target Group
   elb_target_group:
-    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}-tg"
     protocol: http
-    port: "{{ UMBRELLAPORT }}"
+    port: "{{ APPPORT }}"
     vpc_id: "{{ vpc_info.vpcs[0].id }}"
     health_check_path: "{{ HEALTHCHECKPATH }}"
     successful_response_codes: "200"
     targets:
       - Id: "{{ ec2_instance.instances[0].id }}"
-        Port: "{{ UMBRELLAPORT }}"
-      - Id: "{{ ec2_instance.instances[1].id }}"
-        Port: "{{ UMBRELLAPORT }}"
+        Port: "{{ APPPORT }}"
     state: present
 
 - name: Create Application Load Balancer
   elb_application_lb:
-    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+    name: "awsdemo-{{ ENVID }}-{{ ENVNAME }}-elb"
     security_groups:
-      - "awsdemo-{{ ENVID }}-{{ ENVNAME }}-http"
+      - "demosg-{{ ENVID }}-{{ ENVNAME }}-http"
     subnets:
       - "{{ subnet_info.subnets[0].subnet_id }}"
       - "{{ subnet_info.subnets[1].subnet_id }}"
@@ -57,7 +55,7 @@
         Port: 80
         DefaultActions:
           - Type: forward
-            TargetGroupName: "awsdemo-{{ ENVID }}-{{ ENVNAME }}"
+            TargetGroupName: "awsdemo-{{ ENVID }}-{{ ENVNAME }}-tg"
     state: present
   register: elb
 
